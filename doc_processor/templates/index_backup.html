@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Standardizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Document Standardizer</h1>
+            <p class="subtitle">Standardize document formatting using a template</p>
+        </header>
+
+        <main class="main-content">
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="alert alert-error">
+                        {% for message in messages %}
+                            <p>{{ message }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% if not success %}
+                <div class="instructions">
+                    <h2>How it works</h2>
+                    <ol>
+                        <li>Upload a <strong>template document</strong> with the desired formatting standards (.docx)</li>
+                        <li>Upload the <strong>document to standardize</strong> (.docx or .pdf)</li>
+                        <li>The system will analyze the template and apply its formatting to your document</li>
+                        <li>Download the standardized document and review the changes</li>
+                    </ol>
+                </div>
+
+                <form method="POST" action="/process" enctype="multipart/form-data" class="upload-form">
+                    <div class="file-upload-group">
+                        <div class="file-upload-item">
+                            <label for="template" class="file-label">
+                                <div class="file-upload-area">
+                                    <div class="upload-icon">📄</div>
+                                    <h3>Template Document</h3>
+                                    <p>Upload the document with correct formatting (.docx only)</p>
+                                    <input type="file" id="template" name="template" accept=".docx" required>
+                                    <span class="file-name" id="template-name">No file selected</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="file-upload-item">
+                            <label for="document" class="file-label">
+                                <div class="file-upload-area">
+                                    <div class="upload-icon">📝</div>
+                                    <h3>Document to Standardize</h3>
+                                    <p>Upload the document to be formatted (.docx or .pdf)</p>
+                                    <input type="file" id="document" name="document" accept=".docx,.pdf" required>
+                                    <span class="file-name" id="document-name">No file selected</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="process-btn">
+                        <span class="btn-text">Process Documents</span>
+                        <div class="loading-spinner" style="display: none;"></div>
+                    </button>
+                </form>
+            </section>
+            {% endif %}
+
+            {% if success %}
+            <section class="results-section">
+                <div class="success-message">
+                    <h2>✅ Processing Complete!</h2>
+                    <p>Your document has been standardized using the template formatting.</p>
+                </div>
+
+                <div class="download-section">
+                    <h3>Download Files</h3>
+                    <div class="download-links">
+                        <a href="{{ url_for('download_file', filename=original_file) }}" class="download-btn original">
+                            📄 Original Document
+                        </a>
+                        <a href="{{ url_for('download_file', filename=template_file) }}" class="download-btn template">
+                            📋 Template Document
+                        </a>
+                        <a href="{{ url_for('download_file', filename=updated_file) }}" class="download-btn updated">
+                            ✨ Standardized Document
+                        </a>
+                    </div>
+                </div>
+
+                {% if changes_made %}
+                <div class="changes-section">
+                    <h3>Changes Made</h3>
+                    <div class="changes-list">
+                        {% for change in changes_made %}
+                            <div class="change-item">{{ change }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if diff_html %}
+                <div class="diff-section">
+                    <h3>Document Comparison</h3>
+                    <div class="diff-legend">
+                        <span class="legend-item">
+                            <span class="legend-color insertion"></span>
+                            Added content
+                        </span>
+                        <span class="legend-item">
+                            <span class="legend-color deletion"></span>
+                            Removed content
+                        </span>
+                    </div>
+                    <div class="diff-content">
+                        {{ diff_html|safe }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="action-buttons">
+                    <a href="{{ url_for('index') }}" class="btn-secondary">Process Another Document</a>
+                </div>
+            </section>
+            {% endif %}
+        </main>
+
+        <footer class="footer">
+            <p>Document Standardizer - Local Processing Only</p>
+        </footer>
+    </div>
+
+    <script>
+        // File input handling
+        document.getElementById('template').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : 'No file selected';
+            document.getElementById('template-name').textContent = fileName;
+        });
+
+        document.getElementById('document').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : 'No file selected';
+            document.getElementById('document-name').textContent = fileName;
+        });
+
+        // Form submission handling
+        document.querySelector('.upload-form').addEventListener('submit', function(e) {
+            const submitBtn = document.querySelector('.process-btn');
+            const btnText = document.querySelector('.btn-text');
+            const spinner = document.querySelector('.loading-spinner');
+            
+            btnText.style.display = 'none';
+            spinner.style.display = 'inline-block';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+        });
+
+        // Drag and drop functionality
+        const uploadAreas = document.querySelectorAll('.file-upload-area');
+        
+        uploadAreas.forEach(area => {
+            area.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                this.classList.add('drag-over');
+            });
+
+            area.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+            });
+
+            area.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const input = this.querySelector('input[type="file"]');
+                    input.files = files;
+                    
+                    const fileName = files[0].name;
+                    const fileNameSpan = this.querySelector('.file-name');
+                    fileNameSpan.textContent = fileName;
+                }
+            });
+        });
+    </script>
+</body>
+</html>
